@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>예상 수익 리포트 (데모)</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script>document.documentElement.classList.add('js')</script>
+
+<div class="draft" id="draftBar">데모 — 카톡 발송·상담 접수는 연결되어 있지 않습니다</div>
+
+<div id="app"></div>
+
+<template id="tplEmpty">
+  <div class="wrap empty">
+    <div class="brand" style="justify-content:center;color:var(--red)"><i>A</i>OO브랜드</div>
+    <p>리포트를 찾을 수 없습니다.<br>카톡으로 받은 링크를 다시 눌러 주세요.</p>
+    <p style="margin-top:20px"><a class="cta" href="index.html">다시 계산하기</a></p>
+  </div>
+</template>
+
+<template id="tplReport">
+  <header class="rp-head">
+    <div class="wrap">
+      <div class="brand"><i>A</i>OO브랜드 예상 수익 리포트</div>
+      <h1 class="display" id="rpTitle"></h1>
+      <div class="meta" id="rpMeta"></div>
+    </div>
+  </header>
+
+  <main class="rp-body">
+    <div class="wrap">
+      <div class="hero-num rv">
+        <div class="t">투자금 회수까지</div>
+        <div class="big"><span id="rPayback">0</span><small>개월</small></div>
+        <div class="sub">테이블 <b id="rTables">0</b>개 기준 · 3년 동안 약 <b id="rTotal">0</b>만 원</div>
+      </div>
+
+      <div class="stats rv">
+        <div class="stat"><div class="k">월 예상 매출</div><div class="v"><span id="rSales">0</span><small>만</small></div></div>
+        <div class="stat red"><div class="k">월 예상 순이익</div><div class="v"><span id="rProfit">0</span><small>만</small></div></div>
+        <div class="stat"><div class="k">초기 투자금</div><div class="v"><span id="rInvest">0</span><small>만</small></div></div>
+      </div>
+      <div class="normal-line" id="openLine"></div>
+      <div class="normal-line" id="normalLine"></div>
+
+      <div class="card benefit rv" id="benefits"></div>
+
+      <div class="card chart-card rv">
+        <h3>3년 동안 쌓이는 돈</h3>
+        <div class="cap">빨간 선이 점선(투자금)을 넘는 순간부터 남는 돈입니다</div>
+        <svg id="chart" viewBox="0 0 640 340" role="img" aria-label="월별 누적 순이익 그래프"></svg>
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <div class="card breakdown rv">
+        <h3>초기 투자금 내역</h3>
+        <table class="tbl" id="tInvest"></table>
+        <p class="hint" id="partialNote" hidden></p>
+      </div>
+
+      <div class="card breakdown rv">
+        <h3>한 달 손익 (잘 될 때 · 오픈 효과가 끝난 뒤)</h3>
+        <table class="tbl" id="tMonth"></table>
+      </div>
+
+      <div class="rp-cta">
+        <a class="cta block" href="#" data-toast="상담 신청 연결은 준비 중입니다">창업 상담 신청하기</a>
+        <div class="phone-card"><span>상담 대표번호</span><strong id="rpPhone"></strong><button type="button" class="copy" id="copyPhone">번호 복사</button></div>
+        <a class="cta block ghost" href="index.html">조건 바꿔서 다시 계산하기</a>
+      </div>
+
+      <p class="note" id="disclaimer"></p>
+    </div>
+  </main>
+  <footer>
+    <div class="wrap">사업자 정보 영역 (데모)</div>
+  </footer>
+</template>
+
+<script src="calc.js"></script>
+<script>
+(function(){
+  const app = document.getElementById('app');
+  const inputs = readReportLink();
+  if (!inputs || !(inputs.area > 0)){ app.appendChild(document.getElementById('tplEmpty').content.cloneNode(true)); return; }
+  app.appendChild(document.getElementById('tplReport').content.cloneNode(true));
+  const $ = s => document.querySelector(s);
+  const R = computeReport(inputs), m = R.best.m;
+
+  const zone = (SETTINGS.zones.find(z=>z.id===inputs.zone)||{}).name;
+  const biz = (SETTINGS.bizTypes.find(b=>b.id===inputs.biz)||{}).name;
+  $('#rpTitle').innerHTML = `${inputs.sido} ${R.area}평 매장을<br>OO브랜드으로 바꾸면`;
+  $('#rpMeta').innerHTML = [inputs.sido, `${inputs.area}평`, R.belowMin && `${R.minArea}평 기준 계산`, zone, biz && `지금 ${biz}`, inputs.rent ? `월세 ${won(inputs.rent)}만` : null]
+    .filter(Boolean).map(t=>`<span>${t}</span>`).join('');
+
+  $('#rPayback').textContent = R.best.payback ?? '36+';
+  $('#rTables').textContent = R.tables;
+  $('#rTotal').textContent = won(R.best.total);
+  countUp($('#rSales'), m.sales); countUp($('#rProfit'), m.profit); countUp($('#rInvest'), R.invest);
+  setTimeout(() => $('#rPayback').classList.add('pop'), 200);
+
+  $('#openLine').textContent = `오픈 후 ${SETTINGS.openMonths}개월은 월 순이익 약 ${won(R.best.open.profit)}만 원, 그 뒤로는 약 ${won(m.profit)}만 원으로 계산했습니다.`;
+  $('#benefits').innerHTML = '<h3>가맹 혜택</h3><ul>' + SETTINGS.benefits.map(b=>`<li>${b}</li>`).join('') + '</ul><p class="hint">위 투자금에는 혜택을 빼지 않았습니다.</p>';
+  if (R.partial){ $('#partialNote').hidden = false; $('#partialNote').textContent = SETTINGS.partialNote; }
+  $('#rpPhone').textContent = SETTINGS.phone;
+  $('#copyPhone').onclick = () => { navigator.clipboard.writeText(SETTINGS.phone).then(() => toast('번호를 복사했습니다'), () => toast('번호를 길게 눌러 복사해 주세요')); };
+  if (SETTINGS.showNormalCase){
+    $('#normalLine').textContent = `보통 운영 시: 월 순이익 약 ${won(R.normal.m.profit)}만 원 · ${R.normal.payback ? R.normal.payback+'개월' : '36개월 넘게'} 만에 회수`;
+  } else $('#normalLine').remove();
+
+  $('#tInvest').innerHTML = R.investRows.map(r=>`<tr><td>${r[0]}</td><td>${won(r[1])}만 원</td></tr>`).join('') + `<tr class="sum"><td>합계</td><td>${won(R.invest)}만 원</td></tr>`;
+  const pct = v => Math.round(v*1000)/10 + '%';
+  const rows=[['예상 매출',m.sales],[`식재료 (${pct(R.costRate)})`,-m.food],[`인건비 (${pct(SETTINGS.laborRate)})`,-m.labor],[inputs.rent ? '월세' : `월세 (매출의 ${pct(SETTINGS.rentRate)})`,-m.rent],[`카드수수료·공과금·소모품 (${pct(SETTINGS.etcRate)})`,-m.etc],[`로열티 (${pct(SETTINGS.royaltyRate)})`,-m.royalty]];
+  $('#tMonth').innerHTML = rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]<0?'− ':''}${won(Math.abs(r[1]))}만 원</td></tr>`).join('') + `<tr class="sum"><td>남는 돈</td><td>${won(m.profit)}만 원</td></tr>`;
+  $('#disclaimer').textContent = '※ ' + SETTINGS.disclaimer;
+
+  // 그래프는 화면에 들어올 때 그린다
+  const svg = $('#chart');
+  const io = new IntersectionObserver(es => { if (es[0].isIntersecting){ drawChart(svg, $('#legend'), R); io.disconnect(); } }, { threshold: .3 });
+  io.observe(svg);
+  setTimeout(() => { if (!svg.children.length) drawChart(svg, $('#legend'), R); }, 2500);
+})();
+</script>
+</body>
+</html>
